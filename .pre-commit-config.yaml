@@ -1,26 +1,22 @@
 fail_fast: true
 repos:
-  - repo: local
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.11.0
     hooks:
-      - id: ruff-linter
+      - id: ruff
         name: "Ruff linter"
-        language: system
-        entry: poetry run ruff check --fix
-        pass_filenames: false
+        args: [ --exit-non-zero-on-fix, --fix, --config=pyproject.toml ]
         files: '^(docling_sdg|tests).*\.(py|ipynb)$'
-      # Run the formatter.
       - id: ruff-format
         name: "Ruff formatter"
-        language: system
-        entry: poetry run ruff format
-        pass_filenames: false
+        args: [ --config=pyproject.toml ]
         files: '^(docling_sdg|tests).*\.(py|ipynb)$'
   - repo: local
     hooks:
       - id: mypy
         name: MyPy
         language: system
-        entry: poetry run mypy docling_sdg tests
+        entry: uv run mypy docling_sdg tests
         pass_filenames: false
         files: '\.py$'
   - repo: local
@@ -28,13 +24,11 @@ repos:
       - id: pytest
         name: Pytest
         language: system
-        entry: poetry run pytest tests
+        entry: uv run pytest tests
         pass_filenames: false
         files: '\.py$'
-  - repo: local
+  - repo: https://github.com/astral-sh/uv-pre-commit
+    rev: 0.6.8
     hooks:
-      - id: poetry
-        name: Poetry
-        language: system
-        entry: poetry check --lock
-        pass_filenames: false
+      - id: uv-lock
+        name: uv lockfile

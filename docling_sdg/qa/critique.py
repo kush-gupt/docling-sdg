@@ -1,12 +1,13 @@
 import logging
 import time
 from pathlib import Path
-from typing import Iterator, Optional
+from typing import Iterator
 
 import tqdm
 from llama_index.core.prompts.utils import format_string
 from llama_index.llms.ibm import WatsonxLLM
-from pydantic import ConfigDict, ValidationError, validate_call
+from llama_index.llms.ibm.base import GenTextParamsMetaNames
+from pydantic import ConfigDict, TypeAdapter, ValidationError, validate_call
 
 from docling_sdg.qa.base import (
     Critique,
@@ -28,34 +29,39 @@ _log = logging.getLogger(__name__)
 class Judge:
     def __init__(
         self,
-        critique_options: Optional[CritiqueOptions] = None,
+        critique_options: CritiqueOptions,
     ):
-        self.options = critique_options or CritiqueOptions()
+        self.options = critique_options
 
-        if self.options.api_key is None:
-            raise ValueError("API key is required")
-        if self.options.project_id is None:
-            raise ValueError("Project ID is required")
-
+        temp: float = 0.0
+        if self.options.additional_params:
+            temp = TypeAdapter(float).validate_python(
+                self.options.additional_params.get(GenTextParamsMetaNames.TEMPERATURE)
+            )
         llm = WatsonxLLM(
             model_id=self.options.model_id,
-            url=self.options.url,
-            project_id=self.options.project_id,
-            apikey=self.options.api_key,
+            url=str(self.options.url),
+            project_id=self.options.project_id.get_secret_value(),
+            apikey=self.options.api_key.get_secret_value(),
+            max_new_tokens=self.options.max_new_tokens,
+            temperature=temp,
             additional_params=self.options.additional_params,
         )
 
         self.agent = ChatAgent(llm=llm)
 
-    def _get_eval_and_score(self, reply: str) -> Critique:
+    @staticmethod
+    def _get_eval_and_score(reply: str) -> Critique:
         required: list[str] = ["evaluation", "rating", "{", "}"]
         if not reply or any(item not in reply for item in required):
             critique: Critique = Critique(evaluation="non-valid", rating=None)
+            _log.debug(f"Invalid critique reply: {reply}")
         else:
             dict_str = reply[reply.find("{") : reply.rfind("}") + 1]
             try:
-                critique = Critique.model_validate(dict_str)
-            except ValidationError:
+                critique = Critique.model_validate_json(dict_str)
+            except ValidationError as ve:
+                _log.debug(f"Unable to instantiate a Critique from reply: {repr(ve)}")
                 critique = Critique(evaluation="non-valid", rating=None)
 
         return critique
@@ -71,8 +77,8 @@ class Judge:
                     for x in prompt_template.keys
                 },
             )
-            reply = self.agent.ask(prompt)
-            judge_result[prompt_template.name] = self._get_eval_and_score(reply)
+            reply = self.agent.ask(prompt, self.options.max_new_tokens)
+            judge_result[prompt_template.name] = Judge._get_eval_and_score(reply)
 
         return judge_result
 

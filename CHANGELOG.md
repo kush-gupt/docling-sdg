@@ -1,3 +1,9 @@
+## [v0.1.3](https://github.com/docling-project/docling-sdg/releases/tag/v0.1.3) - 2025-03-27
+
+### Fix
+
+* Build package distribution ([#21](https://github.com/docling-project/docling-sdg/issues/21)) ([`d9b949c`](https://github.com/docling-project/docling-sdg/commit/d9b949c329ad3eb759a35a147774c0d0aa7c6942))
+
 ## [v0.1.2](https://github.com/docling-project/docling-sdg/releases/tag/v0.1.2) - 2025-03-26
 
 ### Fix

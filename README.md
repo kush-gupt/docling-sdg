@@ -77,16 +77,20 @@ By default, the results will be exported to the file `docling_sdg_sample.jsonl`.
 For each passage created in the previous step, we can prompt an LLM and generate 3 different questions of the following
 types: _simple fact_, _summary_, and _reasoning_.
 
-Note that Docling SDG uses [watsonx.ai](https://www.ibm.com/products/watsonx-ai) and you will need to provide a
-watsonx.ai project ID, an API key, and a URL (the URL is optional with default value `https://us-south.ml.cloud.ibm.com`).
+The `GenerateOptions` class controls which model provider is used for Q&A generation by setting the `provider` attribute, as shown below. Three options are available:
+
+* `LlmProvider.WATSONX` for [watsonx.ai](https://www.ibm.com/products/watsonx-ai);, you will need to provide a watsonx.ai instance ID and an API key.
+* `LlmProvider.OPENAI` for OpenAI; you will need to provide an OpenAI API key
+* `LlmProvider.OPENAI_LIKE` for any model provider with OpenAI compatible APIs; if no API key is needed (such as when running against `ollama` locally), set `api_key` to any string, e.g. `"fake"`
 
 ```python
 import os
-from docling_sdg.qa.base import GenerateOptions
+from docling_sdg.qa.base import GenerateOptions, LlmProvider
 from docling_sdg.qa.generate import Generator
 from pathlib import Path
 
 options = GenerateOptions(
+    provider=LlmProvider.WATSONX,
     project_id=os.environ.get("WATSONX_PROJECT_ID"),
     api_key=os.environ.get("WATSONX_APIKEY"),
     url=os.environ.get("WATSONX_URL"),
@@ -108,11 +112,12 @@ those evaluations, we can filter the generated dataset to the required quality l
 
 ```python
 import os
-from docling_sdg.qa.base import CritiqueOptions
+from docling_sdg.qa.base import CritiqueOptions, LlmProvider
 from docling_sdg.qa.critique import Judge
 from pathlib import Path
 
 options = CritiqueOptions(
+    provider=LlmProvider.WATSONX,
     project_id=os.environ.get("WATSONX_PROJECT_ID"),
     api_key=os.environ.get("WATSONX_APIKEY"),
     url=os.environ.get("WATSONX_URL"),

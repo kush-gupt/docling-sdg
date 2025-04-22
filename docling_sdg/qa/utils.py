@@ -4,7 +4,7 @@ import hashlib
 import os
 import re
 from pathlib import Path
-from typing import Callable, Final, Iterator, Optional, TypeVar, cast
+from typing import Any, Callable, Final, Iterator, Optional, TypeVar, cast
 
 import jsonlines
 from llama_index.core.base.llms.types import ChatMessage
@@ -13,16 +13,80 @@ from pydantic import BaseModel
 
 from docling_core.transforms.chunker import DocChunk
 
-from docling_sdg.qa.base import GenQAC, QaChunk, QaMeta
+from docling_sdg.qa.base import (
+    GenQAC,
+    GenTextParamsMetaNames,
+    LlmOptions,
+    LlmProvider,
+    QaChunk,
+    QaMeta,
+)
 
 BaseModelT = TypeVar("BaseModelT", bound=BaseModel)
-
 
 _FORBIDDEN_PREFIXES: Final = ["this", "the", "given", "following"]
 _FORBIDDEN_TEXTUALS: Final = ["paragraph", "context", "text", "passage"]
 _FORBIDDEN_TERMS: Final = [
     f"{fp} {ft}" for fp in _FORBIDDEN_PREFIXES for ft in _FORBIDDEN_TEXTUALS
 ]
+
+
+def require_api_key(llm_options: LlmOptions) -> None:
+    if llm_options.api_key is None:
+        raise ValueError("API key is required")
+
+
+def initialize_llm(llm_options: LlmOptions) -> Any:
+    match llm_options.provider:
+        case LlmProvider.OPENAI:
+            require_api_key(llm_options)
+
+            from llama_index.llms.openai import OpenAI
+
+            return OpenAI(
+                model=llm_options.model_id,
+                api_key=llm_options.api_key.get_secret_value()
+                if llm_options.api_key is not None
+                else "",
+                max_tokens=llm_options.max_new_tokens,
+                temperature=llm_options.additional_params[
+                    GenTextParamsMetaNames.TEMPERATURE
+                ],
+            )
+        case LlmProvider.OPENAI_LIKE:
+            from llama_index.llms.openai_like import OpenAILike
+
+            return OpenAILike(
+                model=llm_options.model_id,
+                api_base=llm_options.url,
+                api_key=llm_options.api_key.get_secret_value()
+                if llm_options.api_key is not None
+                else "",
+                max_tokens=llm_options.max_new_tokens,
+                temperature=llm_options.additional_params[
+                    GenTextParamsMetaNames.TEMPERATURE
+                ],
+            )
+        case LlmProvider.WATSONX:
+            require_api_key(llm_options)
+
+            if llm_options.project_id is None:
+                raise ValueError("Project ID is required")
+
+            from llama_index.llms.ibm import WatsonxLLM
+
+            return WatsonxLLM(
+                model_id=llm_options.model_id,
+                url=str(llm_options.url),
+                project_id=llm_options.project_id.get_secret_value(),
+                apikey=llm_options.api_key.get_secret_value()
+                if llm_options.api_key is not None
+                else "",
+                temperature=llm_options.additional_params[
+                    GenTextParamsMetaNames.TEMPERATURE
+                ],
+                additional_params=llm_options.additional_params,
+            )
 
 
 def get_qa_chunks(

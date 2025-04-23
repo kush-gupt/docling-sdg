@@ -1,3 +1,15 @@
+## [v0.2.0](https://github.com/docling-project/docling-sdg/releases/tag/v0.2.0) - 2025-04-23
+
+### Feature
+
+* Add support for OpenAI like LLM provider APIs ([#25](https://github.com/docling-project/docling-sdg/issues/25)) ([`41826c8`](https://github.com/docling-project/docling-sdg/commit/41826c865cd21e236579403a61bdb4952ef6e6cc))
+
+### Documentation
+
+* Update README.md ([#24](https://github.com/docling-project/docling-sdg/issues/24)) ([`2242363`](https://github.com/docling-project/docling-sdg/commit/2242363de9b159430edc94567b5a0cef801eccaf))
+* Added picture to the Readme ([#22](https://github.com/docling-project/docling-sdg/issues/22)) ([`947350c`](https://github.com/docling-project/docling-sdg/commit/947350cc625c60ce32b5f26e7729fa8e4760cdd9))
+* Minor README fixes ([#20](https://github.com/docling-project/docling-sdg/issues/20)) ([`f892765`](https://github.com/docling-project/docling-sdg/commit/f892765b4b2aab03a60b3ccbf417b6b636020549))
+
 ## [v0.1.3](https://github.com/docling-project/docling-sdg/releases/tag/v0.1.3) - 2025-03-27
 
 ### Fix

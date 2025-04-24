@@ -1,3 +1,9 @@
+## [v0.2.1](https://github.com/docling-project/docling-sdg/releases/tag/v0.2.1) - 2025-04-24
+
+### Fix
+
+* GitHub workflow and documentation ([#30](https://github.com/docling-project/docling-sdg/issues/30)) ([`d7c0ba9`](https://github.com/docling-project/docling-sdg/commit/d7c0ba92b2b23e47f2d26126c1981c334d21da91))
+
 ## [v0.2.0](https://github.com/docling-project/docling-sdg/releases/tag/v0.2.0) - 2025-04-23
 
 ### Feature

@@ -1,3 +1,9 @@
+## [v0.2.2](https://github.com/docling-project/docling-sdg/releases/tag/v0.2.2) - 2025-05-08
+
+### Fix
+
+* Adjust generation prompt to increase odds of full QA generation ([#31](https://github.com/docling-project/docling-sdg/issues/31)) ([`d7fb0d9`](https://github.com/docling-project/docling-sdg/commit/d7fb0d9f9fe0fdf021e173a842ce8bcd1912a043))
+
 ## [v0.2.1](https://github.com/docling-project/docling-sdg/releases/tag/v0.2.1) - 2025-04-24
 
 ### Fix

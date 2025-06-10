@@ -1,3 +1,9 @@
+## [v0.2.3](https://github.com/docling-project/docling-sdg/releases/tag/v0.2.3) - 2025-06-10
+
+### Fix
+
+* Api key must not be empty string ([#32](https://github.com/docling-project/docling-sdg/issues/32)) ([`d816d12`](https://github.com/docling-project/docling-sdg/commit/d816d127709f3f563be06e567b8faa0be3285796))
+
 ## [v0.2.2](https://github.com/docling-project/docling-sdg/releases/tag/v0.2.2) - 2025-05-08
 
 ### Fix

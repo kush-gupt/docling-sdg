@@ -85,23 +85,21 @@ def set_llm_options_from_env(options: LlmOptions, provider: LlmProvider) -> None
     # Provider-specific options (for watsonx)
     if provider == LlmProvider.WATSONX and options.additional_params:
         if f"{prefix}_DECODING_METHOD" in os.environ:
-            options.additional_params[
-                GenTextParamsMetaNames.DECODING_METHOD
-            ] = TypeAdapter(str).validate_python(
-                os.environ.get(f"{prefix}_DECODING_METHOD")
+            options.additional_params[GenTextParamsMetaNames.DECODING_METHOD] = (
+                TypeAdapter(str).validate_python(
+                    os.environ.get(f"{prefix}_DECODING_METHOD")
+                )
             )
         if f"{prefix}_MIN_NEW_TOKENS" in os.environ:
-            options.additional_params[
-                GenTextParamsMetaNames.MIN_NEW_TOKENS
-            ] = TypeAdapter(int).validate_python(
-                (os.environ.get(f"{prefix}_MIN_NEW_TOKENS"))
+            options.additional_params[GenTextParamsMetaNames.MIN_NEW_TOKENS] = (
+                TypeAdapter(int).validate_python(
+                    (os.environ.get(f"{prefix}_MIN_NEW_TOKENS"))
+                )
             )
         if f"{prefix}_TEMPERATURE" in os.environ:
-            options.additional_params[
-                GenTextParamsMetaNames.TEMPERATURE
-            ] = TypeAdapter(float).validate_python(
-                os.environ.get(f"{prefix}_TEMPERATURE")
-            )
+            options.additional_params[GenTextParamsMetaNames.TEMPERATURE] = TypeAdapter(
+                float
+            ).validate_python(os.environ.get(f"{prefix}_TEMPERATURE"))
         if f"{prefix}_TOP_K" in os.environ:
             options.additional_params[GenTextParamsMetaNames.TOP_K] = TypeAdapter(
                 int

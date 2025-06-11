@@ -238,27 +238,27 @@ def sample(
     with tempfile.TemporaryDirectory() as tempdir:
         input_doc_paths = _resolve_input_paths(input_sources, Path(tempdir))
 
-    # Build the options dictionary conditionally to handle optional CLI args
-    options_dict: dict[str, Any] = {}
-    if sample_file is not None:
-        options_dict["sample_file"] = sample_file
-    if chunker is not None:
-        options_dict["chunker"] = chunker
-    if min_token_count is not None:
-        options_dict["min_token_count"] = min_token_count
-    if max_passages is not None:
-        options_dict["max_passages"] = max_passages
-    if doc_items is not None:
-        options_dict["doc_items"] = doc_items
-    if seed is not None:
-        options_dict["seed"] = seed
+        # Build the options dictionary conditionally to handle optional CLI args
+        options_dict: dict[str, Any] = {}
+        if sample_file is not None:
+            options_dict["sample_file"] = sample_file
+        if chunker is not None:
+            options_dict["chunker"] = chunker
+        if min_token_count is not None:
+            options_dict["min_token_count"] = min_token_count
+        if max_passages is not None:
+            options_dict["max_passages"] = max_passages
+        if doc_items is not None:
+            options_dict["doc_items"] = doc_items
+        if seed is not None:
+            options_dict["seed"] = seed
 
-    # Pydantic will use the model's defaults for any fields not in the dict
-    options = SampleOptions(**options_dict)
+        # Pydantic will use the model's defaults for any fields not in the dict
+        options = SampleOptions(**options_dict)
 
-    passage_sampler = PassageSampler(sample_options=options)
-    result: SampleResult = passage_sampler.sample(input_doc_paths)
-    typer.echo(f"Q&A Sample finished: {result}")
+        passage_sampler = PassageSampler(sample_options=options)
+        result: SampleResult = passage_sampler.sample(input_doc_paths)
+        typer.echo(f"Q&A Sample finished: {result}")
 
 
 @app.command(

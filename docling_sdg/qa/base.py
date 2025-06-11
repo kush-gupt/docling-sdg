@@ -13,8 +13,8 @@ from pydantic import (
     SecretStr,
 )
 
-from docling_core.transforms.chunker import DocChunk, DocMeta
-from docling_core.types.doc import DocItemLabel
+from docling_core.transforms.chunker.hierarchical_chunker import DocChunk, DocMeta
+from docling_core.types.doc.labels import DocItemLabel
 from docling_core.types.nlp.qa import QAPair
 
 from docling_sdg.qa.prompts.critique_prompts import (
@@ -85,18 +85,21 @@ class LlmOptions(BaseModel):
     )
     url: AnyUrl = Field(
         default=AnyUrl("http://127.0.0.1:11434/v1"),
-        description="Url to LLM API endpoint",
+        description="URL to the LLM API endpoint.",
     )
     project_id: Optional[SecretStr] = Field(
-        default=None, description="ID of the Watson Studio project."
+        default=None,
+        description=(
+            "Project ID for the LLM provider (if applicable, e.g., watsonx.ai)."
+        ),
     )
     api_key: Optional[SecretStr] = Field(
         default=None,
-        description="API key to Watson Machine Learning or CPD instance.",
+        description="API key for the LLM provider.",
     )
     model_id: str = Field(
         default="mistralai/mixtral-8x7b-instruct-v01",
-        description="Which model to use.",
+        description="The model ID to use for generation.",
     )
     max_new_tokens: int = Field(
         default=512, ge=0, description="The maximum number of tokens to generate."
@@ -109,7 +112,9 @@ class LlmOptions(BaseModel):
             GenTextParamsMetaNames.TOP_K: 50,
             GenTextParamsMetaNames.TOP_P: 0.95,
         },
-        description="Additional generation params for the watsonx.ai models.",
+        description=(
+            "Additional generation parameters for the LLM (e.g., for watsonx.ai)."
+        ),
     )
 
 

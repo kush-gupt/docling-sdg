@@ -37,7 +37,6 @@ app = typer.Typer(no_args_is_help=True, add_completion=False)
 console = Console()
 err_console = Console(stderr=True)
 
-# Corrected the Union to include GenerateOptions
 QaOption = Union[SampleOptions, GenerateOptions, CritiqueOptions]
 
 
@@ -253,7 +252,6 @@ def sample(
         if seed is not None:
             options_dict["seed"] = seed
 
-        # Pydantic will use the model's defaults for any fields not in the dict
         options = SampleOptions(**options_dict)
 
         passage_sampler = PassageSampler(sample_options=options)

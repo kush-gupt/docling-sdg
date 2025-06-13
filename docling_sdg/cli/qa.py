@@ -11,7 +11,7 @@ from pydantic import AnyUrl, SecretStr, TypeAdapter
 from rich.console import Console
 
 from docling.datamodel.base_models import FormatToExtensions, InputFormat
-from docling_core.types.doc.labels import DocItemLabel
+from docling_core.types.doc import DocItemLabel
 from docling_core.types.io import DocumentStream
 from docling_core.utils.file import resolve_source_to_path
 

@@ -1,32 +1,30 @@
+import logging  # Added for verbosity tests
 import os
-import pytest
-from typer.testing import CliRunner
-from typer import Abort
-from pathlib import Path
 import tempfile
+from pathlib import Path
 from unittest import mock
-from pydantic import AnyUrl, SecretStr
-from llama_index.llms.ibm.base import GenTextParamsMetaNames
-import logging # Added for verbosity tests
 
-# Import the Typer app from the module to be tested
-from docling_sdg.cli.qa import app, _resolve_input_paths, set_llm_options_from_env
-# PassageSampler and SampleOptions are used by `app` internally,
-# and mocked via their path in cli.qa, so direct imports here are not strictly needed
-# for the provided tests unless directly instantiated/referenced.
-# Similarly for Generator/GenerateOptions and Judge/CritiqueOptions.
+import pytest
+from llama_index.llms.ibm.base import GenTextParamsMetaNames
+from pydantic import AnyUrl, SecretStr
+from typer import Abort
+from typer.testing import CliRunner
+
 from docling.datamodel.base_models import FormatToExtensions, InputFormat
-from docling_sdg.qa.base import LlmOptions, LlmProvider, Chunker
 from docling_core.types.doc.labels import DocItemLabel
 
-# Initialize the CliRunner
+from docling_sdg.cli.qa import _resolve_input_paths, app, set_llm_options_from_env
+from docling_sdg.qa.base import Chunker, LlmOptions, LlmProvider
+
 runner = CliRunner()
+
 
 # Basic test to ensure the app runs and help is shown
 def test_app_no_args():
     result = runner.invoke(app)
     assert result.exit_code == 0
     assert "Usage: main [OPTIONS] COMMAND [ARGS]..." in result.stdout
+
 
 def test_app_help():
     result = runner.invoke(app, ["--help"])
@@ -35,9 +33,6 @@ def test_app_help():
     assert "generate" in result.stdout
     assert "critique" in result.stdout
 
-# Placeholder for future tests - this helps confirm the file is picked up by pytest
-def test_placeholder():
-    assert True
 
 def test_resolve_input_paths_single_file():
     with tempfile.TemporaryDirectory() as tmpdir:
@@ -48,12 +43,18 @@ def test_resolve_input_paths_single_file():
 
         input_file_str = str(test_file_abs)
 
-        with mock.patch("docling_sdg.cli.qa.resolve_source_to_path", side_effect=lambda source, workdir_arg: Path(source) if Path(source).exists() else (_ for _ in ()).throw(FileNotFoundError)) as mock_resolve:
+        with mock.patch(
+            "docling_sdg.cli.qa.resolve_source_to_path",
+            side_effect=lambda source, workdir_arg: Path(source)
+            if Path(source).exists()
+            else (_ for _ in ()).throw(FileNotFoundError),
+        ) as mock_resolve:
             resolved = _resolve_input_paths([input_file_str], workdir)
             mock_resolve.assert_called_once_with(source=input_file_str, workdir=workdir)
             assert len(resolved) == 1
             assert isinstance(resolved[0], Path)
             assert resolved[0] == test_file_abs
+
 
 def test_resolve_input_paths_multiple_files():
     with tempfile.TemporaryDirectory() as tmpdir:
@@ -72,13 +73,20 @@ def test_resolve_input_paths_multiple_files():
                 return path_source
             raise FileNotFoundError("File not found by mock_resolve_side_effect")
 
-        with mock.patch("docling_sdg.cli.qa.resolve_source_to_path", side_effect=mock_resolve_side_effect) as mock_resolve:
+        with mock.patch(
+            "docling_sdg.cli.qa.resolve_source_to_path",
+            side_effect=mock_resolve_side_effect,
+        ) as mock_resolve:
             resolved = _resolve_input_paths([input_file1_str, input_file2_str], workdir)
             assert mock_resolve.call_count == 2
-            calls = [mock.call(source=input_file1_str, workdir=workdir), mock.call(source=input_file2_str, workdir=workdir)]
+            calls = [
+                mock.call(source=input_file1_str, workdir=workdir),
+                mock.call(source=input_file2_str, workdir=workdir),
+            ]
             mock_resolve.assert_has_calls(calls, any_order=True)
             assert len(resolved) == 2
             assert set(resolved) == {test_file1_abs, test_file2_abs}
+
 
 def test_resolve_input_paths_directory():
     with tempfile.TemporaryDirectory() as tmpdir_str:
@@ -97,8 +105,10 @@ def test_resolve_input_paths_directory():
 
         input_dir_abs_str = str(actual_test_dir_abs)
 
-        # Preserve and temporarily modify FormatToExtensions from docling.datamodel.base_models
-        original_format_to_extensions = {k: list(v) for k, v in FormatToExtensions.items()}
+        original_format_to_extensions = {
+            k: list(v) for k, v in FormatToExtensions.items()
+        }
+
         FormatToExtensions.clear()
         FormatToExtensions[InputFormat.TEXT] = ["txt"]
         FormatToExtensions[InputFormat.PDF] = ["pdf"]
@@ -107,16 +117,23 @@ def test_resolve_input_paths_directory():
         def resolve_side_effect_for_dir(source, workdir_arg):
             if source == input_dir_abs_str:
                 raise IsADirectoryError(f"'{source}' is a directory.")
-            raise ValueError(f"resolve_side_effect_for_dir called with unexpected source: {source}")
+            raise ValueError(
+                f"resolve_side_effect_for_dir has unexpected source:{source}"
+            )
 
-        with mock.patch("docling_sdg.cli.qa.resolve_source_to_path", side_effect=resolve_side_effect_for_dir) as mock_resolve_source:
+        with mock.patch(
+            "docling_sdg.cli.qa.resolve_source_to_path",
+            side_effect=resolve_side_effect_for_dir,
+        ) as mock_resolve_source:
             resolved = _resolve_input_paths([input_dir_abs_str], workdir)
 
         # Restore FormatToExtensions
         FormatToExtensions.clear()
         FormatToExtensions.update(original_format_to_extensions)
 
-        mock_resolve_source.assert_called_once_with(source=input_dir_abs_str, workdir=workdir)
+        mock_resolve_source.assert_called_once_with(
+            source=input_dir_abs_str, workdir=workdir
+        )
 
         assert len(resolved) == 3
         expected_paths = {
@@ -126,31 +143,42 @@ def test_resolve_input_paths_directory():
         }
         assert set(resolved) == expected_paths
 
+
 def test_resolve_input_paths_non_existent_file():
     with tempfile.TemporaryDirectory() as tmpdir:
         workdir = Path(tmpdir)
         non_existent_file_abs_str = str(workdir / "non_existent_file.txt")
 
-        with mock.patch("docling_sdg.cli.qa.resolve_source_to_path", side_effect=FileNotFoundError("File not found")) as mock_resolve:
+        with mock.patch(
+            "docling_sdg.cli.qa.resolve_source_to_path",
+            side_effect=FileNotFoundError("File not here"),
+        ) as mock_resolve:
             with pytest.raises(Abort):
                 _resolve_input_paths([non_existent_file_abs_str], workdir)
-            mock_resolve.assert_called_once_with(source=non_existent_file_abs_str, workdir=workdir)
+            mock_resolve.assert_called_once_with(
+                source=non_existent_file_abs_str, workdir=workdir
+            )
+
 
 def test_resolve_input_paths_non_existent_dir_as_input():
     with tempfile.TemporaryDirectory() as tmpdir:
         workdir = Path(tmpdir)
-        input_non_existent_dir_abs_str = str(workdir / "non_existent_dir")
+        input_fake_dir = str(workdir / "non_existent_dir")
 
         def resolve_mock_side_effect(source, workdir_arg):
-            if source == input_non_existent_dir_abs_str:
+            if source == input_fake_dir:
                 raise IsADirectoryError(f"{source} is (allegedly) a directory.")
-            raise FileNotFoundError(f"File not found by resolve_mock_side_effect for {source}")
+            raise FileNotFoundError(f"Not found by resolve_mock_side_effect: {source}")
 
-        with mock.patch("docling_sdg.cli.qa.resolve_source_to_path", side_effect=resolve_mock_side_effect) as mock_resolve:
+        with mock.patch(
+            "docling_sdg.cli.qa.resolve_source_to_path",
+            side_effect=resolve_mock_side_effect,
+        ) as mock_resolve:
             with pytest.raises(Abort) as excinfo:
-                _resolve_input_paths([input_non_existent_dir_abs_str], workdir)
-            assert f"Error: The input file {input_non_existent_dir_abs_str} does not exist." in str(excinfo.value)
-            mock_resolve.assert_called_once_with(source=input_non_existent_dir_abs_str, workdir=workdir)
+                _resolve_input_paths([input_fake_dir], workdir)
+            assert f"Input file {input_fake_dir} does not exist." in str(excinfo.value)
+            mock_resolve.assert_called_once_with(source=input_fake_dir, workdir=workdir)
+
 
 @mock.patch("docling_sdg.cli.qa.resolve_source_to_path")
 def test_resolve_input_paths_url(mock_resolve_source_path_for_url):
@@ -163,18 +191,27 @@ def test_resolve_input_paths_url(mock_resolve_source_path_for_url):
         input_url = "http://example.com/somefile.pdf"
         resolved = _resolve_input_paths([input_url], workdir)
 
-        mock_resolve_source_path_for_url.assert_called_once_with(source=input_url, workdir=workdir)
+        mock_resolve_source_path_for_url.assert_called_once_with(
+            source=input_url, workdir=workdir
+        )
         assert len(resolved) == 1
         assert resolved[0] == mock_url_content_path
 
-@mock.patch("docling_sdg.cli.qa.resolve_source_to_path", side_effect=FileNotFoundError("Mocked URL FileNotFoundError"))
+
+@mock.patch(
+    "docling_sdg.cli.qa.resolve_source_to_path",
+    side_effect=FileNotFoundError("Mocked URL FileNotFoundError"),
+)
 def test_resolve_input_paths_url_not_found(mock_resolve_source_error_for_url):
     with tempfile.TemporaryDirectory() as tmpdir:
         workdir = Path(tmpdir)
         input_url = "http://example.com/non_existent.pdf"
         with pytest.raises(Abort):
             _resolve_input_paths([input_url], workdir)
-        mock_resolve_source_error_for_url.assert_called_once_with(source=input_url, workdir=workdir)
+        mock_resolve_source_error_for_url.assert_called_once_with(
+            source=input_url, workdir=workdir
+        )
+
 
 @mock.patch("docling_sdg.cli.qa.resolve_source_to_path")
 def test_resolve_input_paths_mixed_sources(mock_resolve_source_mixed_case):
@@ -196,9 +233,9 @@ def test_resolve_input_paths_mixed_sources(mock_resolve_source_mixed_case):
                 if path_obj.exists():
                     return path_obj
                 else:
-                    raise FileNotFoundError(f"Mocked local (abs str): {source} not found by side_effect")
+                    raise FileNotFoundError(f"Mocked local:{source} not w/ side_effect")
             else:
-                raise ValueError(f"Unexpected source in mock side_effect_for_mixed: {source}")
+                raise ValueError(f"ValueError in side_effect_for_mixed: {source}")
 
         mock_resolve_source_mixed_case.side_effect = side_effect_for_mixed
 
@@ -211,13 +248,14 @@ def test_resolve_input_paths_mixed_sources(mock_resolve_source_mixed_case):
 
         expected_calls = [
             mock.call(source=local_file_input_str, workdir=workdir),
-            mock.call(source=url_input_str, workdir=workdir)
+            mock.call(source=url_input_str, workdir=workdir),
         ]
         mock_resolve_source_mixed_case.assert_has_calls(expected_calls, any_order=True)
 
+
 # Tests for set_llm_options_from_env
 def test_set_llm_options_from_env_generic_options_watsonx():
-    options = LlmOptions(api_key=SecretStr("dummy_key")) # api_key is required
+    options = LlmOptions(api_key=SecretStr("dummy_key"))  # api_key is required
     provider = LlmProvider.WATSONX
     env_vars = {
         "WATSONX_URL": "http://watsonx.example.com",
@@ -230,6 +268,7 @@ def test_set_llm_options_from_env_generic_options_watsonx():
     assert options.url == AnyUrl("http://watsonx.example.com")
     assert options.model_id == "test_model_123"
     assert options.max_new_tokens == 150
+
 
 def test_set_llm_options_from_env_generic_options_openai():
     options = LlmOptions(api_key=SecretStr("dummy_key"))
@@ -245,6 +284,7 @@ def test_set_llm_options_from_env_generic_options_openai():
     assert options.url == AnyUrl("http://openai.example.com")
     assert options.model_id == "gpt-4"
     assert options.max_new_tokens == 200
+
 
 def test_set_llm_options_from_env_watsonx_specific_params():
     # Initialize with additional_params dictionary
@@ -266,7 +306,8 @@ def test_set_llm_options_from_env_watsonx_specific_params():
     assert options.additional_params[GenTextParamsMetaNames.TOP_K] == 50
     assert options.additional_params[GenTextParamsMetaNames.TOP_P] == 0.9
 
-def test_set_llm_options_from_env_watsonx_specific_params_no_initial_additional_params():
+
+def test_set_llm_options_from_env_watsonx_no_initial_additional_params():
     # Test when additional_params is None initially (as per LlmOptions default)
     options = LlmOptions(api_key=SecretStr("dummy_key"))
     provider = LlmProvider.WATSONX
@@ -276,28 +317,29 @@ def test_set_llm_options_from_env_watsonx_specific_params_no_initial_additional_
     with mock.patch.dict(os.environ, env_vars):
         set_llm_options_from_env(options, provider)
 
-    # The function should not create additional_params if it's None and only try to set if it exists
-    # Based on current implementation: `if provider == LlmProvider.WATSONX and options.additional_params:`
-    # So, if additional_params is None, these specific params should not be set.
     assert options.additional_params is None
 
+
 def test_set_llm_options_from_env_no_env_vars_set():
-    options = LlmOptions(api_key=SecretStr("dummy_key"), url=AnyUrl("http://default.url"))
+    options = LlmOptions(
+        api_key=SecretStr("dummy_key"), url=AnyUrl("http://default.url")
+    )
     original_url = options.url
-    original_model_id = options.model_id # None by default
-    original_max_new_tokens = options.max_new_tokens # None by default
+    original_model_id = options.model_id  # None by default
+    original_max_new_tokens = options.max_new_tokens  # None by default
 
     provider = LlmProvider.OPENAI_LIKE
     # Pass empty dict to mock.patch.dict to ensure no relevant env vars are present
-    with mock.patch.dict(os.environ, {}, clear=True): # clear=True removes all other env vars for the test
+    with mock.patch.dict(os.environ, {}, clear=True):
         set_llm_options_from_env(options, provider)
 
     assert options.url == original_url
     assert options.model_id == original_model_id
     assert options.max_new_tokens == original_max_new_tokens
-    # For WATSONX specific, if additional_params was None, it should remain None
+
     if provider == LlmProvider.WATSONX:
         assert options.additional_params is None
+
 
 def test_set_llm_options_from_env_partial_env_vars():
     options = LlmOptions(api_key=SecretStr("dummy_key"))
@@ -306,7 +348,7 @@ def test_set_llm_options_from_env_partial_env_vars():
         "WATSONX_URL": "http://partial.example.com",
         # MODEL_ID not set
         "WATSONX_MAX_NEW_TOKENS": "50",
-        "WATSONX_DECODING_METHOD": "greedy", # This requires additional_params to be not None
+        "WATSONX_DECODING_METHOD": "greedy",
     }
 
     # To test WATSONX_DECODING_METHOD, additional_params must exist
@@ -316,14 +358,15 @@ def test_set_llm_options_from_env_partial_env_vars():
         set_llm_options_from_env(options, provider)
 
     assert options.url == AnyUrl("http://partial.example.com")
-    assert options.model_id is None # Should remain default (None)
+    assert options.model_id is None  # Should remain default (None)
     assert options.max_new_tokens == 50
     assert options.additional_params[GenTextParamsMetaNames.DECODING_METHOD] == "greedy"
-    assert GenTextParamsMetaNames.TEMPERATURE not in options.additional_params # Check others not set
+    assert GenTextParamsMetaNames.TEMPERATURE not in options.additional_params
+
 
 # Tests for `sample` CLI command
 @mock.patch("docling_sdg.cli.qa.PassageSampler")
-@mock.patch("docling_sdg.cli.qa._resolve_input_paths") # Also mock this helper
+@mock.patch("docling_sdg.cli.qa._resolve_input_paths")
 def test_sample_command_single_file(mock_resolve_paths, mock_passage_sampler_cls):
     runner = CliRunner()
     mock_sampler_instance = mock.Mock()
@@ -334,19 +377,17 @@ def test_sample_command_single_file(mock_resolve_paths, mock_passage_sampler_cls
         test_file = workdir / "input1.pdf"
         test_file.touch()
 
-        # _resolve_input_paths will be called by the command. Mock its return.
         mock_resolve_paths.return_value = [test_file]
 
         result = runner.invoke(app, ["sample", str(test_file)])
 
         assert result.exit_code == 0
-        mock_resolve_paths.assert_called_once() # Check it was called
-        # Check that PassageSampler was initialized with default SampleOptions or specific ones
-        # For a simple call, many options will be default.
-        # We can inspect the call_args for more detail if needed.
+        mock_resolve_paths.assert_called_once()
+
         mock_passage_sampler_cls.assert_called_once()
         mock_sampler_instance.sample.assert_called_once_with([test_file])
         assert "Q&A Sample finished" in result.stdout
+
 
 @mock.patch("docling_sdg.cli.qa.PassageSampler")
 @mock.patch("docling_sdg.cli.qa._resolve_input_paths")
@@ -372,6 +413,7 @@ def test_sample_command_multiple_files(mock_resolve_paths, mock_passage_sampler_
         mock_passage_sampler_cls.assert_called_once()
         mock_sampler_instance.sample.assert_called_once_with(resolved_files)
 
+
 @mock.patch("docling_sdg.cli.qa.PassageSampler")
 @mock.patch("docling_sdg.cli.qa._resolve_input_paths")
 def test_sample_command_with_options(mock_resolve_paths, mock_passage_sampler_cls):
@@ -387,15 +429,26 @@ def test_sample_command_with_options(mock_resolve_paths, mock_passage_sampler_cl
 
         mock_resolve_paths.return_value = [test_file]
 
-        result = runner.invoke(app, [
-            "sample", str(test_file),
-            "--sample-file", str(sample_out_file),
-            "--chunker", "SEMANTIC", # Chunker.SEMANTIC.value
-            "--min-token-count", "50",
-            "--max-passages", "100",
-            "--doc-items", "FIGURE", "TABLE", # DocItemLabel.FIGURE.value, DocItemLabel.TABLE.value
-            "--seed", "42"
-        ])
+        result = runner.invoke(
+            app,
+            [
+                "sample",
+                str(test_file),
+                "--sample-file",
+                str(sample_out_file),
+                "--chunker",
+                "SEMANTIC",  # Chunker.SEMANTIC.value
+                "--min-token-count",
+                "50",
+                "--max-passages",
+                "100",
+                "--doc-items",
+                "FIGURE",
+                "TABLE",
+                "--seed",
+                "42",
+            ],
+        )
 
         assert result.exit_code == 0
         mock_resolve_paths.assert_called_once()
@@ -409,32 +462,30 @@ def test_sample_command_with_options(mock_resolve_paths, mock_passage_sampler_cl
         assert options_passed.chunker == Chunker.SEMANTIC
         assert options_passed.min_token_count == 50
         assert options_passed.max_passages == 100
-        # DocItemLabel enums are tricky with Typer if not handled as Enum explicitly in CLI definition
-        # Assuming they are converted to their string values or handled by Typer's Enum support
         assert DocItemLabel.FIGURE in options_passed.doc_items
         assert DocItemLabel.TABLE in options_passed.doc_items
         assert options_passed.seed == 42
 
         mock_sampler_instance.sample.assert_called_once_with([test_file])
 
+
 @mock.patch("docling_sdg.cli.qa.PassageSampler")
 @mock.patch("docling_sdg.cli.qa._resolve_input_paths")
-def test_sample_command_input_file_not_exist(mock_resolve_paths, mock_passage_sampler_cls):
+def test_sample_input_file_not_exist(mock_resolve_paths, mock_passage_sampler_cls):
     runner = CliRunner()
-    # _resolve_input_paths is responsible for raising Abort if a file doesn't exist.
-    # So, we mock it to simulate this behavior.
     mock_resolve_paths.side_effect = Abort()
 
     result = runner.invoke(app, ["sample", "nonexistent.pdf"])
 
-    assert result.exit_code != 0 # Abort should result in non-zero exit code
-    mock_resolve_paths.assert_called_once_with(["nonexistent.pdf"], mock.ANY) # workdir is a Path object
-    mock_passage_sampler_cls.assert_not_called() # Should not be called if path resolution fails
+    assert result.exit_code != 0
+    mock_resolve_paths.assert_called_once_with(["nonexistent.pdf"], mock.ANY)
+    mock_passage_sampler_cls.assert_not_called()
 
-@mock.patch("docling_sdg.cli.qa.logging.basicConfig") # To check logging setup
+
+@mock.patch("docling_sdg.cli.qa.logging.basicConfig")  # To check logging setup
 @mock.patch("docling_sdg.cli.qa.PassageSampler")
 @mock.patch("docling_sdg.cli.qa._resolve_input_paths")
-def test_sample_command_verbosity_v(mock_resolve_paths, mock_passage_sampler_cls, mock_log_config):
+def test_sample_verbose(mock_resolve_paths, mock_passage_sampler_cls, mock_log_config):
     runner = CliRunner()
     mock_sampler_instance = mock.Mock()
     mock_passage_sampler_cls.return_value = mock_sampler_instance
@@ -449,13 +500,14 @@ def test_sample_command_verbosity_v(mock_resolve_paths, mock_passage_sampler_cls
         # Check that logging.basicConfig was called with level INFO
         mock_log_config.assert_any_call(level=logging.INFO)
 
+
 @mock.patch("docling_sdg.cli.qa.logging.basicConfig")
 @mock.patch("docling_sdg.cli.qa.PassageSampler")
 @mock.patch("docling_sdg.cli.qa._resolve_input_paths")
-def test_sample_command_verbosity_vv(mock_resolve_paths, mock_passage_sampler_cls, mock_log_config):
+def test_sample_command_vv(mock_resolve_paths, mock_ps_cls, mock_log_config):
     runner = CliRunner()
     mock_sampler_instance = mock.Mock()
-    mock_passage_sampler_cls.return_value = mock_sampler_instance
+    mock_ps_cls.return_value = mock_sampler_instance
 
     with tempfile.TemporaryDirectory() as tmpdir:
         test_file = Path(tmpdir) / "logtest_debug.pdf"
@@ -467,11 +519,14 @@ def test_sample_command_verbosity_vv(mock_resolve_paths, mock_passage_sampler_cl
         # Check that logging.basicConfig was called with level DEBUG
         mock_log_config.assert_any_call(level=logging.DEBUG)
 
+
 # Tests for `generate` CLI command
 @mock.patch("docling_sdg.cli.qa.load_dotenv")
 @mock.patch("docling_sdg.cli.qa.set_llm_options_from_env")
 @mock.patch("docling_sdg.cli.qa.Generator")
-def test_generate_command_valid_input(mock_generator_cls, mock_set_llm_opts, mock_load_dotenv):
+def test_generate_command_valid_input(
+    mock_generator_cls, mock_set_llm_opts, mock_load_dotenv
+):
     runner = CliRunner()
     mock_generator_instance = mock.Mock()
     mock_generator_cls.return_value = mock_generator_instance
@@ -482,20 +537,19 @@ def test_generate_command_valid_input(mock_generator_cls, mock_set_llm_opts, moc
         sample_input_file.touch()
 
         env_file = workdir / ".env"
-        env_file.touch() # Create a dummy .env file
+        env_file.touch()  # Create a dummy .env file
 
         # Simulate environment variables needed for LlmOptions after load_dotenv
         # These are for the default provider WATSONX
         env_vars_for_llm = {
             "WATSONX_APIKEY": "testapikey",
-            "WATSONX_PROJECT_ID": "testprojectid"
+            "WATSONX_PROJECT_ID": "testprojectid",
         }
 
         with mock.patch.dict(os.environ, env_vars_for_llm):
-            result = runner.invoke(app, [
-                "generate", str(sample_input_file),
-                "--env-file", str(env_file)
-            ])
+            result = runner.invoke(
+                app, ["generate", str(sample_input_file), "--env-file", str(env_file)]
+            )
 
         assert result.exit_code == 0, f"CLI Error: {result.stdout}"
         mock_load_dotenv.assert_called_once_with(env_file)
@@ -503,19 +557,19 @@ def test_generate_command_valid_input(mock_generator_cls, mock_set_llm_opts, moc
 
         # Check that set_llm_options_from_env was called
         mock_set_llm_opts.assert_called_once()
-        # args_list = mock_set_llm_opts.call_args_list[0] # Get the first call's arguments
-        # called_options_obj = args_list[0][0] # The LlmOptions instance
-        # called_provider = args_list[0][1] # The LlmProvider
-        # assert isinstance(called_options_obj, GenerateOptions)
-        # assert called_provider == LlmProvider.WATSONX # Default provider
 
-        mock_generator_instance.generate_from_sample.assert_called_once_with(sample_input_file)
+        mock_generator_instance.generate_from_sample.assert_called_once_with(
+            sample_input_file
+        )
         assert "Q&A Generation finished" in result.stdout
+
 
 @mock.patch("docling_sdg.cli.qa.load_dotenv")
 @mock.patch("docling_sdg.cli.qa.set_llm_options_from_env")
 @mock.patch("docling_sdg.cli.qa.Generator")
-def test_generate_command_options_and_provider(mock_generator_cls, mock_set_llm_opts, mock_load_dotenv):
+def test_generate_command_options_and_provider(
+    mock_generator_cls, mock_set_llm_opts, mock_load_dotenv
+):
     runner = CliRunner()
     mock_generator_instance = mock.Mock()
     mock_generator_cls.return_value = mock_generator_instance
@@ -528,16 +582,24 @@ def test_generate_command_options_and_provider(mock_generator_cls, mock_set_llm_
         env_file = workdir / "custom.env"
         env_file.touch()
 
-        env_vars_for_llm = {"OPENAI_APIKEY": "openaikey"} # For OPENAI provider
+        env_vars_for_llm = {"OPENAI_APIKEY": "openaikey"}  # For OPENAI provider
 
         with mock.patch.dict(os.environ, env_vars_for_llm):
-            result = runner.invoke(app, [
-                "generate", str(sample_input_file),
-                "--generated-file", str(generated_output_file),
-                "--max-qac", "50",
-                "--provider", "OPENAI",
-                "--env-file", str(env_file)
-            ])
+            result = runner.invoke(
+                app,
+                [
+                    "generate",
+                    str(sample_input_file),
+                    "--generated-file",
+                    str(generated_output_file),
+                    "--max-qac",
+                    "50",
+                    "--provider",
+                    "OPENAI",
+                    "--env-file",
+                    str(env_file),
+                ],
+            )
 
         assert result.exit_code == 0, f"CLI Error: {result.stdout}"
         mock_load_dotenv.assert_called_once_with(env_file)
@@ -557,31 +619,42 @@ def test_generate_command_options_and_provider(mock_generator_cls, mock_set_llm_
         # called_provider = mock_set_llm_opts.call_args[0][1]
         # assert called_provider == LlmProvider.OPENAI
 
-        mock_generator_instance.generate_from_sample.assert_called_once_with(sample_input_file)
+        mock_generator_instance.generate_from_sample.assert_called_once_with(
+            sample_input_file
+        )
+
 
 def test_generate_command_input_file_not_exist():
     runner = CliRunner()
     with tempfile.TemporaryDirectory() as tmpdir:
         env_file = Path(tmpdir) / ".env"
         env_file.touch()
-        result = runner.invoke(app, ["generate", "nonexistent.jsonl", "--env-file", str(env_file)])
+        result = runner.invoke(
+            app, ["generate", "nonexistent.jsonl", "--env-file", str(env_file)]
+        )
     assert result.exit_code != 0
     assert "Error: The input file nonexistent.jsonl does not exist." in result.stdout
+
 
 def test_generate_command_env_file_not_exist():
     runner = CliRunner()
     with tempfile.TemporaryDirectory() as tmpdir:
         sample_file = Path(tmpdir) / "sample.jsonl"
         sample_file.touch()
-        result = runner.invoke(app, ["generate", str(sample_file), "--env-file", "nonexistent.env"])
+        result = runner.invoke(
+            app, ["generate", str(sample_file), "--env-file", "nonexistent.env"]
+        )
     assert result.exit_code != 0
-    assert "Error: The environment file nonexistent.env does not exist." in result.stdout
+    assert "Error: The env file nonexistent.env does not exist." in result.stdout
+
 
 @mock.patch("docling_sdg.cli.qa.logging.basicConfig")
 @mock.patch("docling_sdg.cli.qa.load_dotenv")
 @mock.patch("docling_sdg.cli.qa.set_llm_options_from_env")
 @mock.patch("docling_sdg.cli.qa.Generator")
-def test_generate_command_verbosity_vv(mock_generator_cls, mock_set_llm, mock_load_env, mock_log_config):
+def test_generate_command_verbosity_vv(
+    mock_generator_cls, mock_set_llm, mock_load_env, mock_log_config
+):
     runner = CliRunner()
     mock_generator_instance = mock.Mock()
     mock_generator_cls.return_value = mock_generator_instance
@@ -593,21 +666,29 @@ def test_generate_command_verbosity_vv(mock_generator_cls, mock_set_llm, mock_lo
         env_file = workdir / ".env.debug"
         env_file.touch()
 
-        with mock.patch.dict(os.environ, {"WATSONX_APIKEY": "testkey"}): # Minimal env for options init
-            result = runner.invoke(app, [
-                "generate", str(sample_input_file),
-                "--env-file", str(env_file),
-                "-vv"
-            ])
+        with mock.patch.dict(os.environ, {"WATSONX_APIKEY": "testkey"}):
+            result = runner.invoke(
+                app,
+                [
+                    "generate",
+                    str(sample_input_file),
+                    "--env-file",
+                    str(env_file),
+                    "-vv",
+                ],
+            )
 
     assert result.exit_code == 0, f"CLI Error: {result.stdout}"
     mock_log_config.assert_any_call(level=logging.DEBUG)
+
 
 # Tests for `critique` CLI command
 @mock.patch("docling_sdg.cli.qa.load_dotenv")
 @mock.patch("docling_sdg.cli.qa.set_llm_options_from_env")
 @mock.patch("docling_sdg.cli.qa.Judge")
-def test_critique_command_valid_input(mock_judge_cls, mock_set_llm_opts, mock_load_dotenv):
+def test_critique_command_valid_input(
+    mock_judge_cls, mock_set_llm_opts, mock_load_dotenv
+):
     runner = CliRunner()
     mock_judge_instance = mock.Mock()
     mock_judge_cls.return_value = mock_judge_instance
@@ -622,14 +703,13 @@ def test_critique_command_valid_input(mock_judge_cls, mock_set_llm_opts, mock_lo
 
         env_vars_for_llm = {
             "WATSONX_APIKEY": "critique_apikey",
-            "WATSONX_PROJECT_ID": "critique_projectid"
+            "WATSONX_PROJECT_ID": "critique_projectid",
         }
 
         with mock.patch.dict(os.environ, env_vars_for_llm):
-            result = runner.invoke(app, [
-                "critique", str(qna_input_file),
-                "--env-file", str(env_file)
-            ])
+            result = runner.invoke(
+                app, ["critique", str(qna_input_file), "--env-file", str(env_file)]
+            )
 
         assert result.exit_code == 0, f"CLI Error: {result.stdout}"
         mock_load_dotenv.assert_called_once_with(env_file)
@@ -643,10 +723,13 @@ def test_critique_command_valid_input(mock_judge_cls, mock_set_llm_opts, mock_lo
         mock_judge_instance.critique.assert_called_once_with(qna_input_file)
         assert "Q&A Critique finished" in result.stdout
 
+
 @mock.patch("docling_sdg.cli.qa.load_dotenv")
 @mock.patch("docling_sdg.cli.qa.set_llm_options_from_env")
 @mock.patch("docling_sdg.cli.qa.Judge")
-def test_critique_command_options_and_provider(mock_judge_cls, mock_set_llm_opts, mock_load_dotenv):
+def test_critique_command_options_and_provider(
+    mock_judge_cls, mock_set_llm_opts, mock_load_dotenv
+):
     runner = CliRunner()
     mock_judge_instance = mock.Mock()
     mock_judge_cls.return_value = mock_judge_instance
@@ -659,16 +742,24 @@ def test_critique_command_options_and_provider(mock_judge_cls, mock_set_llm_opts
         env_file = workdir / "custom_critique.env"
         env_file.touch()
 
-        env_vars_for_llm = {"OPENAI_LIKE_APIKEY": "openaikey"} # For OPENAI_LIKE provider
+        env_vars_for_llm = {"OPENAI_LIKE_APIKEY": "openaikey"}
 
         with mock.patch.dict(os.environ, env_vars_for_llm):
-            result = runner.invoke(app, [
-                "critique", str(qna_input_file),
-                "--critiqued-file", str(critiqued_output_file),
-                "--max-qac", "25",
-                "--provider", "OPENAI_LIKE", # Using OPENAI_LIKE
-                "--env-file", str(env_file)
-            ])
+            result = runner.invoke(
+                app,
+                [
+                    "critique",
+                    str(qna_input_file),
+                    "--critiqued-file",
+                    str(critiqued_output_file),
+                    "--max-qac",
+                    "25",
+                    "--provider",
+                    "OPENAI_LIKE",  # Using OPENAI_LIKE
+                    "--env-file",
+                    str(env_file),
+                ],
+            )
 
         assert result.exit_code == 0, f"CLI Error: {result.stdout}"
         mock_load_dotenv.assert_called_once_with(env_file)
@@ -679,7 +770,7 @@ def test_critique_command_options_and_provider(mock_judge_cls, mock_set_llm_opts
 
         assert options_passed.critiqued_file == critiqued_output_file
         assert options_passed.max_qac == 25
-        assert options_passed.provider == LlmProvider.OPENAI_LIKE # Check provider
+        assert options_passed.provider == LlmProvider.OPENAI_LIKE  # Check provider
         assert options_passed.api_key.get_secret_value() == "openaikey"
 
         mock_set_llm_opts.assert_called_once()
@@ -688,29 +779,38 @@ def test_critique_command_options_and_provider(mock_judge_cls, mock_set_llm_opts
 
         mock_judge_instance.critique.assert_called_once_with(qna_input_file)
 
+
 def test_critique_command_input_file_not_exist():
     runner = CliRunner()
     with tempfile.TemporaryDirectory() as tmpdir:
         env_file = Path(tmpdir) / ".env"
         env_file.touch()
-        result = runner.invoke(app, ["critique", "nonexistent_qna.jsonl", "--env-file", str(env_file)])
+        result = runner.invoke(
+            app, ["critique", "nonexistent_qna.jsonl", "--env-file", str(env_file)]
+        )
     assert result.exit_code != 0
-    assert "Error: The input file nonexistent_qna.jsonl does not exist." in result.stdout
+    assert "Error: The file nonexistent_qna.jsonl does not exist." in result.stdout
+
 
 def test_critique_command_env_file_not_exist():
     runner = CliRunner()
     with tempfile.TemporaryDirectory() as tmpdir:
         qna_file = Path(tmpdir) / "qna.jsonl"
         qna_file.touch()
-        result = runner.invoke(app, ["critique", str(qna_file), "--env-file", "nonexistent.env"])
+        result = runner.invoke(
+            app, ["critique", str(qna_file), "--env-file", "nonexistent.env"]
+        )
     assert result.exit_code != 0
-    assert "Error: The environment file nonexistent.env does not exist." in result.stdout
+    assert "Error: The env file nonexistent.env does not exist." in result.stdout
+
 
 @mock.patch("docling_sdg.cli.qa.logging.basicConfig")
 @mock.patch("docling_sdg.cli.qa.load_dotenv")
 @mock.patch("docling_sdg.cli.qa.set_llm_options_from_env")
 @mock.patch("docling_sdg.cli.qa.Judge")
-def test_critique_command_verbosity_v(mock_judge_cls, mock_set_llm, mock_load_env, mock_log_config):
+def test_critique_command_verbosity_v(
+    mock_judge_cls, mock_set_llm, mock_load_env, mock_log_config
+):
     runner = CliRunner()
     mock_judge_instance = mock.Mock()
     mock_judge_cls.return_value = mock_judge_instance
@@ -723,11 +823,16 @@ def test_critique_command_verbosity_v(mock_judge_cls, mock_set_llm, mock_load_en
         env_file.touch()
 
         with mock.patch.dict(os.environ, {"WATSONX_APIKEY": "testkey"}):
-            result = runner.invoke(app, [
-                "critique", str(qna_input_file),
-                "--env-file", str(env_file),
-                "-v" # Single -v for INFO logging
-            ])
+            result = runner.invoke(
+                app,
+                [
+                    "critique",
+                    str(qna_input_file),
+                    "--env-file",
+                    str(env_file),
+                    "-v",  # Single -v for INFO logging
+                ],
+            )
 
     assert result.exit_code == 0, f"CLI Error: {result.stdout}"
     mock_log_config.assert_any_call(level=logging.INFO)

@@ -362,7 +362,7 @@ def generate(
 
 @app.command(
     no_args_is_help=True,
-    help="Use LLM as a judge to critique a set of SDG question-answering items.",
+    help="Use LLM as a judge to critique a set of SDG Q&A items.",
 )
 def critique(
     input_source: Annotated[

@@ -35,4 +35,4 @@ def get_version() -> None:
     typer.echo(f"Platform: {platform_str}")
 
 
-app.add_typer(qa_app, name="qa", help="Interact with SDG for question-answering.")
+app.add_typer(qa_app, name="qa", help="Interact with SDG for Q&A.")

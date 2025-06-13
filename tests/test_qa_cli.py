@@ -18,6 +18,7 @@ runner = CliRunner()
 
 # Assisted by: Jules (Gemini 2.5 pro)
 
+
 def test_app_help() -> None:
     result = runner.invoke(app, ["--help"])
     assert result.exit_code == 0

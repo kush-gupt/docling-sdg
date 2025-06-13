@@ -1,3 +1,9 @@
+## [v0.3.0](https://github.com/docling-project/docling-sdg/releases/tag/v0.3.0) - 2025-06-13
+
+### Feature
+
+* Add provider options to CLI instead of relying on hardcoded WatsonX vars ([#33](https://github.com/docling-project/docling-sdg/issues/33)) ([`5d1bd13`](https://github.com/docling-project/docling-sdg/commit/5d1bd13daf09691508d6bdd80bea5a0a364224ac))
+
 ## [v0.2.3](https://github.com/docling-project/docling-sdg/releases/tag/v0.2.3) - 2025-06-10
 
 ### Fix

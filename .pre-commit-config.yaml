@@ -16,7 +16,7 @@ repos:
       - id: mypy
         name: MyPy
         language: system
-        entry: python -m uv run mypy docling_sdg tests
+        entry: uv run mypy docling_sdg tests
         pass_filenames: false
         files: '\.py$'
   - repo: local
